@@ -4,6 +4,7 @@ import pprint as pp
 import numpy as np
 import time
 
+
 def el_num(collection):
     return sum([len(e) for e in collection])
 
