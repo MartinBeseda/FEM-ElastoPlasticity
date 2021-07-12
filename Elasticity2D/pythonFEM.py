@@ -17,6 +17,17 @@ import scipy.sparse.linalg as sspl
 import typing as tp
 from numba import njit
 import logging as log
+import matplotlib.pyplot as plt
+import matplotlib.patches as patch
+import os
+
+##############
+# Qt settings
+##############
+os.environ["QT_DEVICE_PIXEL_RATIO"] = "0"
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+os.environ["QT_SCREEN_SCALE_FACTORS"] = "1"
+os.environ["QT_SCALE_FACTOR"] = "1"
 
 ####################
 # Set logging level
@@ -532,6 +543,8 @@ def get_nodes_1(level: int,
                          Ct[V3],
                          Ct[V4]])
 
+    elem = elem.astype(int)
+
     ###############
     # Body surface
     ###############
@@ -667,8 +680,47 @@ def assemble_mesh(level: int, element_type: LagrangeElementType, size_xy: float,
 
 
 def draw_mesh(coordinates: np.array, elements: np.array, elem_type: LagrangeElementType):
-    # TODO implement
-    raise NotImplementedError()
+    """
+    This function draws mesh and nodal point on the surface of the body
+
+    :param coordinates: coordinates of the nodes, size(coord)=(2,n_n) where n_n is a number of nodes
+    :type coordinates: numpy.array
+
+    :param elements: array containing numbers of nodes defining each element,
+                     elem.shape = (n_p, n_e), n_e = number of elements
+    :type elements: numpy.array
+
+    :param elem_type: type of Lagrange finite element
+    :type elem_type: LagrangeElementType
+    """
+
+    # coord_aux = np.vstack([coordinates,
+    #                        np.zeros((1, coordinates.shape[1]))]).transpose()
+
+    coord_aux = list(zip(*coordinates))
+
+    fig = plt.figure()
+
+    ax = fig.add_subplot(111, aspect='equal')
+    # triangle = patch.Polygon(((0.05, 0.1), (0.396, 0.1), (0.223, 0.38)))
+    # pythonFEM.plt.scatter([8], [4])
+    # ax.autoscale()
+
+    plt.plot(coordinates[0, ], coordinates[1, ], 'b.')
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.axis('off')
+
+    # Draw polygons
+    if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2):
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
+    elif elem_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:4, ].transpose()]
+
+    for poly in polygons:
+        test = patch.Polygon(poly, fc='w', ec='b')
+        ax.add_artist(test)
+
+    plt.show()
 
 
 def draw_displacement(coordinates , elem , U, U_disp, elem_type, size_xy,size_hole):
@@ -798,6 +850,11 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     print(f'Stored energy: {e}')
 
     # TODO implement drawing functions!
+    # TODO should be drawing placed here?
+    if draw:
+        draw_mesh(mesh['coordinates'], mesh['elements'], element_type)
+
+    a=1
 
 
 if __name__ == '__main__':
