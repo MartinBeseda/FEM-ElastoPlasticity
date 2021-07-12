@@ -5,22 +5,31 @@ intended to solve elasticity and plasticity problems.
 
 # TODO consider object-oriented architecture!
 
+#################
+# Import modules
+#################
 import enum
-import os
-
 import numpy as np
 import numpy.matlib as npm
 import scipy as sp
 import scipy.sparse as ssp
+import scipy.sparse.linalg as sspl
 import typing as tp
 from numba import njit
+import logging as log
+
+####################
+# Set logging level
+####################
+log.basicConfig(level=log.INFO)
+
 
 # os.environ["NUMBA_DISABLE_JIT"] = "1"
 
 
 #@njit
 def flatten_row(v: np.array) -> np.array:
-    return np.reshape(v, (1, np.size(v)), order='F')
+    return np.reshape(v, (1, -1), order='F')
 
 
 #@njit
@@ -351,7 +360,7 @@ def get_elastic_stiffness_matrix(elements: np.array,
     n_n = np.size(coordinates, 1)  # number of nodes including midpoints
     n_e = np.size(elements, 1)  # number of elements
     n_p = np.size(elements, 0)  # number of vertices per element
-    n_q = np.size(wf, 0)  # number of quadrature points
+    n_q = np.size(wf)  # number of quadrature points
     n_int = n_e * n_q  # total number of integrations points
 
     # Jacobian
@@ -440,8 +449,11 @@ def get_elastic_stiffness_matrix(elements: np.array,
 
     # elastic stiffness matrix
     K = B.transpose() * D * B
+    log.info(f'K: nonzero elms. / no. elms. = {K.nnz}/{K.shape[0] * K.shape[1]}, '
+             f'Density = {K.nnz / (K.shape[0] * K.shape[1])}')
 
-    return K.toarray(), weight
+    # return K.toarray(), weight
+    return K, weight
 
 
 #@njit
@@ -505,15 +517,6 @@ def get_nodes_1(level: int,
 
     elem = None
     if element_type == LagrangeElementType.P1:
-        #
-        # aux_elem = np.array([C[V1].transpose().flatten(order='F'),
-        #                      C[V2].transpose().flatten(order='F'),
-        #                      C[V4].transpose().flatten(order='F'),
-        #                      C[V2].transpose().flatten(order='F'),
-        #                      C[V3].transpose().flatten(order='F'),
-        #                      C[V4].transpose().flatten(order='F')])
-        #
-
         aux_elem = np.array([Ct[V1],
                              Ct[V2],
                              Ct[V4],
@@ -524,10 +527,10 @@ def get_nodes_1(level: int,
         elem = aux_elem.reshape((3, n_e), order='F')
 
     elif element_type == LagrangeElementType.Q1:
-        elem = np.array([C[V1].transpose().flatten(order='F'),
-                         C[V2].transpose().flatten(order='F'),
-                         C[V3].transpose().flatten(order='F'),
-                         C[V4].transpose().flatten(order='F')])
+        elem = np.array([Ct[V1],
+                         Ct[V2],
+                         Ct[V3],
+                         Ct[V4]])
 
     ###############
     # Body surface
@@ -657,8 +660,8 @@ def assemble_mesh(level: int, element_type: LagrangeElementType, size_xy: float,
     mesh = None
     if element_type in (LagrangeElementType.P1, LagrangeElementType.Q1):
         mesh = assemble_mesh_1(level, element_type, size_xy, size_hole)
-    else:
-        mesh = assemble_mesh_1(level, element_type, size_xy, size_hole)
+    elif element_type in (LagrangeElementType.P2, LagrangeElementType.Q2):
+        mesh = assemble_mesh_2(level, element_type, size_xy, size_hole)
 
     return mesh
 
@@ -750,7 +753,8 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     # Assembling of the vector of volume forces
     ############################################
     f_V_int = np.dot(volume_force.transpose(), np.ones((1, n_int)))
-    f_V = get_vector_volume(mesh['elements'], mesh['coordinates'], f_V_int, hatp, weight).toarray().flatten(order='F')
+    # f_V = get_vector_volume(mesh['elements'], mesh['coordinates'], f_V_int, hatp, weight).toarray().flatten(order='F')
+    f_V = get_vector_volume(mesh['elements'], mesh['coordinates'], f_V_int, hatp, weight).reshape((-1, 1), order='F')
 
     ##############################################
     # Assembling of the vector of traction forces
@@ -759,29 +763,38 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     n_q_s = len(wf_s)
     n_int_s = n_e_s * n_q_s
     f_t_int = np.dot(traction_force.transpose(), np.ones((1, n_int_s)))
+    # f_t = get_vector_traction(mesh['neumann_nodes'],
+    #                           mesh['coordinates'],
+    #                           f_t_int, hatp_s, dhatp1_s, wf_s).toarray().flatten(order='F')
     f_t = get_vector_traction(mesh['neumann_nodes'],
                               mesh['coordinates'],
-                              f_t_int, hatp_s, dhatp1_s, wf_s).toarray().flatten(order='F')
+                              f_t_int, hatp_s, dhatp1_s, wf_s).reshape((-1, 1), order='F')
 
     ud = (0.5*mesh['dirichlet_nodes'])
-    ud_flat = ud.flatten(order='F')
+    # ud_flat = ud.flatten(order='F')
+    ud_flat = ud.reshape((-1, 1), order='F')
 
     #############
     # Processing
     #############
-    f = (f_t + f_V - np.dot(K, ud_flat)).reshape((-1, 1), order='F')
+    # f = (f_t + f_V - np.dot(K, ud_flat)).reshape((-1, 1), order='F')
+    f = (f_t + f_V - (K @ ud_flat)).reshape((-1, 1), order='F')
     u = ud.copy()
     # Computation of displacements
     # TODO is possible in a simpler way?
     Q_flat = mesh['Q'].reshape((-1, 1), order='F')
     K_bool_indices = (Q_flat @ Q_flat.transpose()).astype(bool)
+
+    # TODO following returns DENSE 'matrix' type, which is also deprecated
+    # Can be done in a different way?
     stiff_mat = K[K_bool_indices]
-    stiff_mat = stiff_mat.reshape((int(np.sqrt(stiff_mat.shape[0])), -1), order='F')
-    u.transpose()[mesh['Q'].transpose()] = np.linalg.solve(stiff_mat, f[Q_flat])
+    stiff_mat = stiff_mat.reshape((int(np.sqrt(stiff_mat.shape[1])), -1), order='F')
+    u.transpose()[mesh['Q'].transpose()] = np.linalg.solve(stiff_mat.A, f[Q_flat].A.transpose()).flatten(order='F')
+    # u.transpose()[mesh['Q'].transpose()] = sspl.spsolve(stiff_mat.A, f[Q_flat].A.transpose())
     u_flat = u.flatten(order='F')
 
     # Stored energy
-    e = 0.5*u_flat @ K @ u_flat - (f_t + f_V) @ u_flat
+    e = (0.5*u_flat @ K @ u_flat - (f_t + f_V).transpose() @ u_flat)[0]
     print(f'Stored energy: {e}')
 
     # TODO implement drawing functions!
