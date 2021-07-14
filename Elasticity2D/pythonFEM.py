@@ -19,6 +19,7 @@ from numba import njit
 import logging as log
 import matplotlib.pyplot as plt
 import matplotlib.patches as patch
+import matplotlib.cm as cm
 import os
 
 ##############
@@ -711,6 +712,7 @@ def draw_mesh(coordinates: np.array, elements: np.array, elem_type: LagrangeElem
     plt.axis('off')
 
     # Draw polygons
+    polygons = None
     if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2):
         polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
     elif elem_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
@@ -723,9 +725,65 @@ def draw_mesh(coordinates: np.array, elements: np.array, elem_type: LagrangeElem
     plt.show()
 
 
-def draw_displacement(coordinates , elem , U, U_disp, elem_type, size_xy,size_hole):
-    # TODO implement
-    raise NotImplementedError()
+def draw_displacement(coordinates: np.array, elements: np.array, u: np.array, u_disp: np.array,
+                      elem_type: LagrangeElementType, size_xy: int, size_hole: int):
+    """
+    This function depicts prescribed displacements, deformed and undeformed shape of the body
+
+    :param coordinates: coordinates of the nodes, size(coord)=(2,n_n) where n_n is a number of nodes
+    :type coordinates: numpy.array
+
+    :param elements: array containing numbers of nodes defining each element, elem.shape=(n_p,n_e),
+                     n_e = number of elements
+    :type elements: numpy.array
+
+    :param u: nodal displacements, u.shape=(2,n_n)
+    :type u: numpy.array
+
+    :param u_disp: prescribed displacements (e.g. total displacement or displacements in x directions, etc.),
+                   u_disp.shape=(1,n_n)
+    :type u_disp: numpy.array
+
+    :param elem_type: the type of finite elements
+    :type elem_type: LagrangeElementType
+
+    :param size_xy: size of the body in x and y direction
+    :type size_xy: int
+
+    :param size_hole: size of the hole in the body, size_hole < size_xy
+    :type size_hole: int
+    """
+
+    fig = plt.figure()
+    coord_aux = list(zip(*coordinates + u))
+    ax = fig.add_subplot(111, aspect='equal')
+
+    # Draw polygons
+    polygons = None
+    colors = None
+
+    # TODO implement color gradient
+    cmap = cm.get_cmap('gist_rainbow')
+    if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2):
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
+        colors = [list(map(np.mean, list(zip(*[cmap(u_disp[idx]) for i, idx in enumerate(idx_list)]))))
+                  for idx_list in elements[0:3, ].transpose()]
+    elif elem_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:4, ].transpose()]
+        colors = [list(map(np.mean, list(zip(*[cmap(u_disp[idx]) for i, idx in enumerate(idx_list)]))))
+                  for idx_list in elements[0:4, ].transpose()]
+
+    for i, poly in enumerate(polygons):
+        test = patch.Polygon(poly, color=colors[i], alpha=1)
+        ax.add_artist(test)
+
+    plt.plot((size_hole, size_xy), (0, 0))
+    plt.plot([0, size_xy], [size_xy, size_xy])
+    plt.plot([0, size_hole], [size_hole, size_hole])
+    plt.plot([0, 0], [size_hole, size_xy])
+    plt.plot([size_hole, size_hole], [0, size_hole])
+    plt.plot([size_xy, size_xy], [0, size_xy])
+    plt.show()
 
 
 #@njit
@@ -805,7 +863,6 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     # Assembling of the vector of volume forces
     ############################################
     f_V_int = np.dot(volume_force.transpose(), np.ones((1, n_int)))
-    # f_V = get_vector_volume(mesh['elements'], mesh['coordinates'], f_V_int, hatp, weight).toarray().flatten(order='F')
     f_V = get_vector_volume(mesh['elements'], mesh['coordinates'], f_V_int, hatp, weight).reshape((-1, 1), order='F')
 
     ##############################################
@@ -815,21 +872,16 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     n_q_s = len(wf_s)
     n_int_s = n_e_s * n_q_s
     f_t_int = np.dot(traction_force.transpose(), np.ones((1, n_int_s)))
-    # f_t = get_vector_traction(mesh['neumann_nodes'],
-    #                           mesh['coordinates'],
-    #                           f_t_int, hatp_s, dhatp1_s, wf_s).toarray().flatten(order='F')
     f_t = get_vector_traction(mesh['neumann_nodes'],
                               mesh['coordinates'],
                               f_t_int, hatp_s, dhatp1_s, wf_s).reshape((-1, 1), order='F')
 
     ud = (0.5*mesh['dirichlet_nodes'])
-    # ud_flat = ud.flatten(order='F')
     ud_flat = ud.reshape((-1, 1), order='F')
 
     #############
     # Processing
     #############
-    # f = (f_t + f_V - np.dot(K, ud_flat)).reshape((-1, 1), order='F')
     f = (f_t + f_V - (K @ ud_flat)).reshape((-1, 1), order='F')
     u = ud.copy()
     # Computation of displacements
@@ -853,8 +905,8 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     # TODO should be drawing placed here?
     if draw:
         draw_mesh(mesh['coordinates'], mesh['elements'], element_type)
-
-    a=1
+        u_total = np.sqrt(u[0, ]**2 + u[1, ]**2)
+        draw_displacement(mesh['coordinates'], mesh['elements'], u, u_total, element_type, size_xy, size_hole)
 
 
 if __name__ == '__main__':
