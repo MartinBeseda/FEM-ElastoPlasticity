@@ -1,4 +1,4 @@
-from pythonFEM import *
+import pythonFEM
 
 if __name__ == '__main__':
-    elasticity_fem()
+    pythonFEM.elasticity_fem(element_type=pythonFEM.LagrangeElementType.Q2, level=1)
