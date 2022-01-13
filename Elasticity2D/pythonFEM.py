@@ -371,7 +371,7 @@ def get_elastic_stiffness_matrix(elements: np.array,
                                  bulk: np.array,
                                  dhatp1: np.array,
                                  dhatp2: np.array,
-                                 wf: np.array) -> tp.Tuple[np.array, float]:
+                                 wf: np.array) -> tp.Tuple[np.array, np.array]:
     n_n = np.size(coordinates, 1)  # number of nodes including midpoints
     n_e = np.size(elements, 1)  # number of elements
     n_p = np.size(elements, 0)  # number of vertices per element
@@ -1171,10 +1171,11 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     e = (0.5 * u_flat @ K @ u_flat - (f_t + f_V).transpose() @ u_flat)[0]
     print(f'Stored energy: {e}')
 
-    # TODO should be drawing placed here?
+    # TODO move drawing outside of the function
+    # TODO return variables important for subsequent plotting
     if draw:
         draw_mesh(mesh['coordinates'], mesh['elements'], element_type)
-        u_total = np.sqrt(u[0,] ** 2 + u[1,] ** 2)
+        u_total = np.sqrt(u[0, ] ** 2 + u[1, ] ** 2)
         draw_displacement(mesh['coordinates'], mesh['elements'], u, u_total, element_type, size_xy, size_hole)
 
 
