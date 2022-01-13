@@ -110,14 +110,20 @@ def get_nodes_1(level: int,
     V4[0:N_x, 1:(N_y+1)] = 1
     V4 = V4.T
 
-    # used division of a rectangle into 2 triangles:
-    #   V1 V2 V4
-    #   V2 V3 V4
-    # size(aux_elem)=(2*3,n_e/2)
-    aux_elem = np.array((Ct[V1], Ct[V2], Ct[V4], Ct[V2], Ct[V3], Ct[V4]))
+    elem = None
+    if element_type == LagrangeElementType.P1:
+        # used division of a rectangle into 2 triangles:
+        #   V1 V2 V4
+        #   V2 V3 V4
+        # size(aux_elem)=(2*3,n_e/2)
+        aux_elem = np.array((Ct[V1], Ct[V2], Ct[V4], Ct[V2], Ct[V3], Ct[V4]))
 
-    # the array elem, size(elem)=(3,n_e)
-    elem = aux_elem.reshape((3, n_e), order='F')
+        # the array elem, size(elem)=(3,n_e)
+        elem = aux_elem.reshape((3, n_e), order='F')
+
+    elif element_type == LagrangeElementType.Q1:
+        # Unit cube
+        elem = np.array([Ct[V1], Ct[V2], Ct[V3], Ct[V4]])
 
     # Surface of the body - the array "surf"
 
@@ -800,7 +806,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     n_n = mesh['coordinates'].shape[1]
     n_unknown = len(mesh['coordinates'][mesh['Q']])
     n_e = mesh['elements'].shape[1]
-    n_q = len(wf)
+    n_q = np.size(wf)
     n_int = n_e*n_q
 
     log.log(log.INFO, f'number of nodes = {n_n}')
@@ -816,7 +822,8 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
 
     # stiffness matrix assembly and the assembly time
     # TODO measure time of matrix assembling (OPTIONALLY!)
-    K_elast, B, weight, iD, jD, D_elast = get_elastic_stiffness_matrix(mesh['elements'], mesh['coordinates'], shear, bulk, dhatp1, dhatp2, wf)
+    K_elast, B, weight, iD, jD, D_elast = get_elastic_stiffness_matrix(mesh['elements'], mesh['coordinates'], shear,
+                                                                       bulk, dhatp1, dhatp2, wf)
 
     # Plastic material parameters
 
@@ -840,10 +847,8 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     U_it = Ud
     Q_flat = mesh['Q'].reshape((-1, 1), order='F')
     K_bool_indices = (Q_flat @ Q_flat.transpose()).astype(bool)
-    # U_it[mesh['Q']] = np.linalg.solve(K_elast[K_bool_indices], f[Q_flat])
     stiff_mat = K_elast[K_bool_indices]
     stiff_mat = stiff_mat.reshape((int(np.sqrt(stiff_mat.shape[1])), -1), order='F')
-    # print(stiff_mat.A.shape, np.linalg.matrix_rank(stiff_mat.A))
     U_it.transpose()[mesh['Q'].transpose()] = np.linalg.solve(stiff_mat, f[Q_flat].transpose()).flatten(order='F')
 
     # other initialization
@@ -893,13 +898,9 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
             K_tangent = K_elast + B.T * (D_p-D_elast) * B
 
             # measuring assembly dependance on plastic integration points
-            n_plast = len(weight[constitutive_problem['ind_p'].reshape((1, 800))])
+            # n_plast = len(weight[constitutive_problem['ind_p'].reshape((1, 800))])
 
             # TODO measure time of matrix assembling!
-
-            # assembly[assembly_step, :] = np.[n_plast, assembly_time]
-            # assembly_step += 1
-            # fprintf('  time spent on K_tangent: %6.1e seconds, ', assembly_time)
 
             # vector of internal forces
             F = B.T * np.reshape(np.tile(weight, (3, 1)) * constitutive_problem['s'][0:3, :], (3*n_int, 1), order='F')
@@ -932,7 +933,6 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
             # test on the stopping criterion
             if criterion < 1e-12:
                 break
-
 
         # TODO implement Newton solver AS A SEPARATE FUNCTION!
         constitutive_problem = None
