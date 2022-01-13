@@ -189,7 +189,158 @@ def get_nodes_1(level: int,
 def get_nodes_2(level: int,
                 element_type: LagrangeElementType,
                 size_xy: float) -> tp.Dict[str, np.array]:
-    raise NotImplementedError()
+    # Number of segments, nodes and elements
+    N_x = size_xy * 2**level
+    N_y = N_x
+    n_e = 2 * N_x * N_y
+
+    # C - 2D auxilliary array that contains node numbers and that is important
+    # for the mesh construction.
+    Ct = None
+    Q_mid = None
+    if element_type == LagrangeElementType.P2:
+        C = np.array(range((2*N_x+1)*(2*N_y+1))).reshape((2*N_x+1, 2*N_y+1), order='F')
+        Ct = C.T
+    elif element_type == LagrangeElementType.Q2:
+        C = np.zeros((2 * N_x + 1, 2 * N_y + 1))
+        Ct = C.T
+        Q_mid = np.ones((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+        Q_mid[1::2, 1::2] = 0
+        Ct[Q_mid] = np.array(range(np.size(C[Q_mid])))
+
+    # Coordinates of nodes
+    #
+    # coordinates in directions x and y
+    coord_x = np.linspace(0, size_xy, 2*N_x+1)
+    coord_y = np.linspace(0, size_xy, 2*N_y+1)
+
+    # long 1D arrays containing coordinates of all nodes in x,y directions
+    coord = None
+    if element_type == LagrangeElementType.P2:
+        c_x = np.tile(coord_x, 2 * N_y + 1)
+        c_y = np.kron(coord_y, np.ones(2*N_x+1))
+
+        # the required array of coordinates, size(coord)=(2,n_n)
+        coord = np.array([c_x, c_y])
+
+    elif element_type == LagrangeElementType.Q2:
+        c_x = np.tile(coord_x.reshape((-1, 1), order='F'), (1, 2 * N_y + 1))
+        c_y = np.tile(coord_y, (2*N_x + 1, 1))
+        coord = np.array([c_x.T[Q_mid], c_y.T[Q_mid]])
+
+    # construction of the array elem
+    #
+    # ordering of the nodes creating the unit cube:
+    #  V1 -> [0 0], V2 -> [1 0], V3 -> [1 1], V4 -> [0 1]
+    #  V1,...,V4 are logical 2D arrays which enable to select appropriate
+    #  nodes from the array C
+    V1 = np.zeros((2*N_x+1, 2*N_y+1), dtype=bool)
+    V1[0:2*N_x-1:2, 0:2*N_y-1:2] = 1
+    V1 = V1.T
+
+    V2 = np.zeros((2*N_x+1, 2*N_y+1), dtype=bool)
+    V2[2:(2*N_x+1):2, 0:2*N_y-1:2] = 1
+    V2 = V2.T
+
+    V3 = np.zeros((2*N_x+1, 2*N_y+1), dtype=bool)
+    V3[2:(2*N_x+1):2, 2:(2*N_y+1):2] = 1
+    V3 = V3.T
+
+    V4 = np.zeros((2*N_x+1, 2*N_y+1), dtype=bool)
+    V4[0:2*N_x-1:2, 2:(2*N_y+1):2] = 1
+    V4 = V4.T
+
+    # logical arrays for midpoints, e.g.V12 represents the midpoints between V1 and V2
+    V12 = np.zeros((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+    V12[1:(2 * N_x):2, 0:(2 * N_y - 1):2] = 1
+    V12 = V12.T
+
+    V14 = np.zeros((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+    V14[0:(2 * N_x - 1):2, 1:(2 * N_y):2] = 1
+    V14 = V14.T
+
+    V23 = np.zeros((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+    V23[2:(2 * N_x + 1):2, 1:(2 * N_y):2] = 1
+    V23 = V23.T
+
+    V24 = np.zeros((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+    V24[1:(2 * N_x):2, 1:(2 * N_y):2] = 1
+    V24 = V24.T
+
+    V34 = np.zeros((2 * N_x + 1, 2 * N_y + 1), dtype=bool)
+    V34[1:(2 * N_x):2, 2:(2 * N_y + 1):2] = 1
+    V34 = V34.T
+
+    elem = None
+    if element_type == LagrangeElementType.P2:
+        aux_elem = np.array((Ct[V1], Ct[V2], Ct[V4], Ct[V24], Ct[V14], Ct[V12],
+                             Ct[V2], Ct[V3], Ct[V4], Ct[V34], Ct[V24], Ct[V23]))
+        elem = aux_elem.reshape((6, n_e), order='F')
+
+    elif element_type == LagrangeElementType.Q2:
+        elem = np.array((Ct[V1], Ct[V2], Ct[V3], Ct[V4], Ct[V12], Ct[V23], Ct[V34], Ct[V14]))
+
+    # Surface of the body - the array "surf"
+
+    # Edge 1: y=0 (the bottom of the body)
+    C_s = C[:, 0].reshape(-1, 1)
+    V1_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V1_s[0:2*N_x-1:2, 0] = 1
+    V2_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V2_s[2:(2*N_x+1):2, 0] = 1
+    V12_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V12_s[1:2*N_x:2, 0] = 1
+    aux_surf = np.array((C_s[V1_s], C_s[V2_s], C_s[V12_s]))
+    surf1 = aux_surf.reshape(3, N_x)
+
+    # Edge 2: x=size_xy (the right hand side of the body)
+    C_s = C[-1, :].reshape(-1, 1)
+    V1_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V1_s[0:2*N_y-1:2, 0] = 1
+    V2_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V2_s[2:(2*N_y+1):2, 0] = 1
+    V12_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V12_s[1:2*N_y:2] = 1
+    aux_surf = np.array((C_s[V1_s], C_s[V2_s], C_s[V12_s]))
+    surf2 = aux_surf.reshape(3, N_y)
+
+    # Edge 3: y=size_xy (the top of the body)
+    C_s = C[:, -1].reshape(-1, 1)
+    V1_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V1_s[0:2*N_x-1:2, 0] = 1
+    V2_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V2_s[2:(2*N_x+1):2, 0] = 1
+    V12_s = np.zeros((2*N_x+1, 1), dtype=bool)
+    V12_s[1:2*N_x:2] = 1
+    aux_surf = np.array((C_s[V1_s], C_s[V2_s], C_s[V12_s]))
+    surf3 = aux_surf.reshape(3, N_x)
+
+    # Edge 4: x=0 (the left hand side of the body)
+    C_s = C[0, :].reshape(-1, 1)
+    V1_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V1_s[0:2*N_y-1:2, 0] = 1
+    V2_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V2_s[2:(2*N_y+1):2, 0] = 1
+    V12_s = np.zeros((2*N_y+1, 1), dtype=bool)
+    V12_s[1:2*N_y:2, 0] = 1
+    aux_surf = np.array((C_s[V1_s], C_s[V2_s], C_s[V12_s]))
+    surf4 = aux_surf.reshape(3, N_y)
+
+    # the array "surf"
+    surf = np.concatenate((surf1, surf2, surf3, surf4), axis=1)
+
+    # Boundary conditions
+
+    # array indicating the nodes with non-homogen. Dirichlet boundary cond.
+    dirichlet = np.zeros(coord.shape)
+    dirichlet[1, np.logical_and((coord[1, :] == size_xy), (coord[0, :] <= 1.0001))] = 1
+
+    # logical array indicating the nodes with the Dirichlet boundary cond.
+    Q = coord > 0
+    Q[1, np.logical_and((coord[1, :] == size_xy), (coord[0, :] <= 1.0001))] = 0
+    Q[0, (coord[0, :] == size_xy)] = 0
+
+    return {'coordinates': coord, 'elements': elem.astype(int), 'surface': surf, 'dirichlet_nodes': dirichlet, 'Q': Q}
 
 
 def assemble_mesh_1(level: int, element_type: LagrangeElementType, size_xy: float):
@@ -652,7 +803,7 @@ def transform(q_int: np.array, elements: np.array, weight: np.array) -> np.array
 
     # row and column indices, size(iF)=size(jF)=(n_p,n_int)
     iF = np.zeros((n_p, n_int), dtype=int)
-    jF = np.kron(elements, np.ones((1, n_q), dtype=int))
+    jF = np.kron(elements, np.ones((1, n_q), dtype=int)).astype(int)
 
     # the asssembling by using the sparse command - values v for duplicate
     # doubles i,j are automatically added together
@@ -701,7 +852,7 @@ def draw_mesh(coordinates: np.array, elements: np.array, elem_type: LagrangeElem
     if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2):
         polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
     elif elem_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
-        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:4, ].transpose()]
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements.astype(int)[0:4, ].transpose()]
 
     for poly in polygons:
         test = patch.Polygon(poly, fc='w', ec='b')
@@ -723,8 +874,9 @@ def draw_quantity(coordinates, elements, u, q_node, element_type, size_xy):
         polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
         colors = [list(map(np.mean, list(zip(*[cmap(q_node[idx]) for i, idx in enumerate(idx_list)]))))
                   for idx_list in elements[0:3, ].transpose()]
+
     elif element_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
-        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:4, ].transpose()]
+        polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements.astype(int)[0:4, ].transpose()]
         colors = [list(map(np.mean, list(zip(*[cmap(q_node[idx]) for i, idx in enumerate(idx_list)]))))
                   for idx_list in elements[0:4, ].transpose()]
 
