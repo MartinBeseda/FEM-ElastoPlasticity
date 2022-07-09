@@ -158,8 +158,8 @@ def get_local_basis_volume(el_type: LagrangeElementType, xi: np.array) -> tuple:
     :rtype: tuple
     """
 
-    xi_1 = xi[0,]
-    xi_2 = xi[1,]
+    xi_1 = xi[0, ]
+    xi_2 = xi[1, ]
 
     # For P2 case
     xi_0 = 1 - xi_1 - xi_2
@@ -376,7 +376,7 @@ def get_elastic_stiffness_matrix(elements: np.array,
                                  bulk: np.array,
                                  dhatp1: np.array,
                                  dhatp2: np.array,
-                                 wf: np.array) -> tp.Tuple[np.array, np.array]:
+                                 wf: np.array):
     # TODO rewrite as class method to prevent code duplicating!
 
     n_n = np.size(coordinates, 1)  # number of nodes including midpoints
@@ -1292,6 +1292,127 @@ def draw_quantity(coordinates, elements, u, q_node):
     plt.show()
 
 
+def create_midpoints(elem_type: LagrangeElementType, coord, elem):
+    # numbers of elements and vertices
+    n_e = elem.shape[1]
+    n_n = coord.shape[1]
+
+    # predefinition of unknown arrays
+    coord_mid = np.zeros((2, 2*n_e))
+    elem_mid = np.zeros((3, n_e))
+    elem_ed = np.zeros((3, n_e))
+    edge_el = np.zeros((2, 2*n_e))
+    surf = np.zeros((3, n_e))
+
+    # for cyclus over elements
+    ind = 0   # enlarging index specifying midpoints
+    ind_s = 0  # enlarging index specifying surf
+    for i in range(n_e):
+        # vertices defining the i-th element
+        V1 = elem[0, i]
+        V2 = elem[1, i]
+        V3 = elem[2, i]
+
+        # analysis of the edge V2-V3
+        if elem_mid[0, i] == 0:
+            # creation of a new midpoint
+
+            coord_mid[:, ind] = (coord[:, V2] + coord[:, V3])/2  # its coordinates
+            elem_mid[0, i] = n_n + ind
+            elem_ed[0, i] = ind
+            edge_el[0, ind] = i
+            # finding the adjacent element j to i which contains the edge V2-V3
+            row1, col1 = np.where(elem == V2)
+            row2, col2 = np.where(elem == V3)
+            j = np.setdiff1d(np.intersect1d(col1, col2), i)
+            if len(j):
+                # This case means that the edge V2-V3 is the intersection of the
+                # elements i and j.
+                edge_el[1, ind] = j
+                v = elem[:, j]
+                if V3 == v[0]:
+                    elem_mid[2, j] = n_n + ind
+                    elem_ed[2, j] = ind
+                elif V3 == v[1]:
+                    elem_mid[0, j] = n_n + ind
+                    elem_ed[0, j] = ind
+                else:
+                    elem_mid[1, j] = n_n + ind
+                    elem_ed[1, j] = ind
+            else:
+                surf[:, ind_s] = np.array([[V3], [V2], [n_n+ind]])
+                ind_s += 1
+            ind += 1  # number of a new midpoint
+
+        # analysis of the edge V3-V1
+        if elem_mid[1, i] == 0:
+            # creation of a new midpoint
+            coord_mid[:, ind] = (coord[:, V3] + coord[:, V1])/2 # its coordinates
+            elem_mid[1, i] = n_n + ind
+            elem_ed[1, i] = ind
+            edge_el[0, ind] = i
+            # finding the adjacent element j to i which contains the edge V3-V1
+            row1, col1 = np.where(elem == V3)
+            row2, col2 = np.where(elem == V1)
+            j = np.setdiff1d(np.intersect1d(col1, col2), i)
+            if len(j):
+                # This case means that the edge V2-V3 is the intersection of the
+                # elements i and j.
+                edge_el[1, ind] = j
+                v=elem[:, j]
+                if V1 == v[0]:
+                    elem_mid[2,j] = n_n + ind
+                    elem_ed[2,j] = ind
+                elif V1 == v[1]:
+                    elem_mid[0,j] = n_n + ind
+                    elem_ed[0,j] = ind
+                else:
+                    elem_mid[1,j] = n_n + ind
+                    elem_ed[1, j] = ind
+            else:
+                surf[:, ind_s] = np.array([V1, V3, n_n+ind])
+                ind_s += 1
+            ind += 1
+
+        # analysis of the edge V1-V2
+        if elem_mid[2, i] == 0:
+            # creation of a new midpoint
+            coord_mid[:, ind] = (coord[:, V1] + coord[:, V2])/2 # its coordinates
+            elem_mid[2, i] = n_n+ind
+            elem_ed[2, i] = ind
+            edge_el[0, ind] = i
+            # finding the adjacent element j to i which contains the edge V1-V2
+            row1, col1 = np.where(elem==V1)
+            row2, col2 = np.where(elem==V2)
+            j = np.setdiff1d(np.intersect1d(col1,col2) , i)
+            if len(j):
+                # This case means that the edge V2-V3 is the intersection of the
+                # elements i and j.
+                edge_el[1, ind] = j
+                v = elem[:, j]
+                if V2 == v[0]:
+                    elem_mid[2, j] = n_n+ind
+                    elem_ed[2, j] = ind
+                elif V2 == v[1]:
+                  elem_mid[0, j] = n_n+ind
+                  elem_ed[0, j] = ind
+                else:
+                  elem_mid[1, j] = n_n+ind
+                  elem_ed[1, j] = ind
+            else:
+                surf[:, ind_s] = np.array([V2, V1, n_n+ind])
+                ind_s += 1
+            ind += 1
+
+    coord_mid = coord_mid[:, 0:ind]
+    surf = surf[:, 0:ind_s]
+    coord_ext = np.concatenate([coord, coord_mid], axis=1)
+    elem_ext = np.array(np.concatenate([elem, elem_mid], axis=0), dtype=int)
+
+    return {'coord_mid': coord_mid, 'surf': surf, 'coord_ext': coord_ext, 'elem_ext': elem_ext,
+            'elem_ed': elem_ed, 'edge_el': edge_el}
+
+
 # @njit
 def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
                    level: int = 1,
@@ -1348,7 +1469,9 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
 
     # TODO implement
     if element_type == LagrangeElementType.P2:
-        pass
+        midp_dict = create_midpoints(element_type, coords, elem)
+        coords = midp_dict['coord_ext']
+        elem = midp_dict['elem_ext']
     elif element_type == LagrangeElementType.P4:
         pass
 
@@ -1402,8 +1525,12 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     Q_flat = Q.flatten(order='F')
     Q_logic = np.outer(Q_flat, Q_flat)
     nonzero_dim = int(np.sqrt(np.count_nonzero(Q_logic)))
-    K_masked = K[Q_logic].reshape((nonzero_dim, nonzero_dim))
-    U_elast[Q] = np.linalg.solve(K_masked, -F0.T[Q.T])
+    K_masked = K.T[Q_logic].reshape((nonzero_dim, nonzero_dim), order='F')
+
+    # K_masked_matlab = np.genfromtxt('kelast_qq.csv', dtype=float, delimiter=',')
+    # F0q_matlab = np.genfromtxt('f0q.csv', dtype=float, delimiter=',')
+    U_elast.T[Q.T] = np.linalg.solve(K_masked, -F0.T[Q.T])
+    # U_elast.T[Q.T] = np.linalg.solve(K_masked_matlab, -F0q_matlab)
 
     U_it = d_zeta * U_elast
     dU = np.zeros((2, n_n))
@@ -1416,12 +1543,12 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     displ_hist = np.zeros(100)
 
     step = 0
-    print(f'step: {step}')
+    # print(f'step: {step}')
     while True:
         zeta = zeta_old + d_zeta
         E0_zeta = zeta * init_strain
-        print(f'load factor = {zeta}')
-        print(f'load increment = {d_zeta}')
+        # print(f'load factor = {zeta}')
+        # print(f'load increment = {d_zeta}')
 
         n_it = 25
         for it in range(n_it):
@@ -1433,7 +1560,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
                                  shape=(3 * n_int, 3 * n_int))
             K_tangent = K + B.T * (D_p-D_elast) * B
             F = (B.T @ (np.tile(weight, (3, 1)) * const_problem['s'][0:3, :]).reshape((3*n_int, 1), order='F')).reshape((2, n_n), order='F')
-            K_tangent_masked = K_tangent[Q_logic].reshape((nonzero_dim, nonzero_dim))
+            K_tangent_masked = K_tangent.T[Q_logic].reshape((nonzero_dim, nonzero_dim), order='F')
 
             dU.T[Q.T] = np.linalg.solve(K_tangent_masked, -F.T[Q.T])
             dU_flat = dU.flatten(order='F')
@@ -1451,7 +1578,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
                 it = n_it
                 break
 
-            print(f'criterion: {criterion}')
+            # print(f'criterion: {criterion}')
 
             U_it = U_new
 
