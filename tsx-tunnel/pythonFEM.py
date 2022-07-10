@@ -110,7 +110,20 @@ def get_quadrature_volume(el_type: LagrangeElementType) -> tp.Tuple[np.array, np
                  LagrangeElementType.Q2: (np.array([[-pt, pt, pt, -pt, 0, pt, 0, -pt, 0],
                                                     [-pt, -pt, pt, pt, -pt, 0, pt, 0, 0]]),
                                           np.array([[25 / 81, 25 / 81, 25 / 81, 25 / 81, 40 / 81, 40 / 81, 40 / 81,
-                                                     40 / 81, 64 / 81]]))}
+                                                     40 / 81, 64 / 81]])),
+                 LagrangeElementType.P4: (np.array([[0.063089014491502, 0.06308901449102, 0.873821971016996,
+                                                     0.249286745170910, 0.249286745170910, 0.501426509658179,
+                                                     0.310352451033785, 0.310352451033785, 0.053145049844816,
+                                                     0.053145049844816, 0.636502499121399, 0.636502499121399],
+                                                    [0.063089014491502, 0.873821971016996, 0.063089014491502,
+                                                     0.249286745170910, 0.501426509658179, 0.249286745170910,
+                                                     0.053145049844816, 0.636502499121399, 0.310352451033785,
+                                                     0.636502499121399, 0.310352451033785, 0.053145049844816]]),
+                                          np.array([[0.050844906370207, 0.050844906370207, 0.050844906370207,
+                                                     0.116786275726379, 0.116786275726379, 0.116786275726379,
+                                                     0.082851075618374, 0.082851075618374, 0.082851075618374,
+                                                     0.082851075618374, 0.082851075618374, 0.082851075618374]])/2)
+                 }
 
     return init_dict[el_type]
 
@@ -210,7 +223,53 @@ def get_local_basis_volume(el_type: LagrangeElementType, xi: np.array) -> tuple:
                                           np.array([-(1 - xi_1) / 4,
                                                     -(1 + xi_1) / 4,
                                                     (1 + xi_1) / 4,
-                                                    (1 - xi_1) / 4]))}
+                                                    (1 - xi_1) / 4])),
+                 LagrangeElementType.P4: (np.array([ xi_0*(4*xi_0-1)*(4*xi_0-2)*(4*xi_0-3)/6,
+                                                     xi_1*(4*xi_1-1)*(4*xi_1-2)*(4*xi_1-3)/6,
+                                                     xi_2*(4*xi_2-1)*(4*xi_2-2)*(4*xi_2-3)/6,
+                                                     4*xi_0*xi_1*(4*xi_0-1)*(4*xi_1-1),
+                                                     4*xi_1*xi_2*(4*xi_1-1)*(4*xi_2-1),
+                                                     4*xi_0*xi_2*(4*xi_0-1)*(4*xi_2-1),
+                                                     8*xi_0*xi_1*(4*xi_0-1)*(4*xi_0-2)/3,
+                                                     8*xi_0*xi_1*(4*xi_1-1)*(4*xi_1-2)/3,
+                                                     8*xi_1*xi_2*(4*xi_1-1)*(4*xi_1-2)/3,
+                                                     8*xi_1*xi_2*(4*xi_2-1)*(4*xi_2-2)/3,
+                                                     8*xi_0*xi_2*(4*xi_2-1)*(4*xi_2-2)/3,
+                                                     8*xi_0*xi_2*(4*xi_0-1)*(4*xi_0-2)/3,
+                                                     32*xi_0*xi_1*xi_2*(4*xi_0-1),
+                                                     32*xi_0*xi_1*xi_2*(4*xi_1-1),
+                                                     32*xi_0*xi_1*xi_2*(4*xi_2-1)]),
+                                          np.array([-((4*xi_0-1)*(4*xi_0-2)*(4*xi_0-3)+4*xi_0*(4*xi_0-2)*(4*xi_0-3)+4*xi_0*(4*xi_0-1)*(4*xi_0-3)+4*xi_0*(4*xi_0-1)*(4*xi_0-2))/6,
+                                                    ((4*xi_1-1)*(4*xi_1-2)*(4*xi_1-3)+4*xi_1*(4*xi_1-2)*(4*xi_1-3)+4*xi_1*(4*xi_1-1)*(4*xi_1-3)+4*xi_1*(4*xi_1-1)*(4*xi_1-2))/6,
+                                                    np.zeros(n_q),
+                                                    4*(-xi_1*(4*xi_0-1)*(4*xi_1-1)+xi_0*(4*xi_0-1)*(4*xi_1-1)-4*xi_0*xi_1*(4*xi_1-1)+4*xi_0*xi_1*(4*xi_0-1)),
+                                                    4*(xi_2*(4*xi_1-1)*(4*xi_2-1)+4*xi_1*xi_2*(4*xi_2-1)),
+                                                    4*(-xi_2*(4*xi_0-1)*(4*xi_2-1)-4*xi_0*xi_2*(4*xi_2-1)),
+                                                    8*(-xi_1*(4*xi_0-1)*(4*xi_0-2)+xi_0*(4*xi_0-1)*(4*xi_0-2)-4*xi_0*xi_1*(4*xi_0-2)-4*xi_0*xi_1*(4*xi_0-1))/3,
+                                                    8*(-xi_1*(4*xi_1-1)*(4*xi_1-2)+xi_0*(4*xi_1-1)*(4*xi_1-2)+4*xi_0*xi_1*(4*xi_1-2)+4*xi_0*xi_1*(4*xi_1-1))/3,
+                                                    8*(xi_2*(4*xi_1-1)*(4*xi_1-2)+4*xi_1*xi_2*(4*xi_1-2)+4*xi_1*xi_2*(4*xi_1-1))/3,
+                                                    8*xi_2*(4*xi_2-1)*(4*xi_2-2)/3,
+                                                   -8*xi_2*(4*xi_2-1)*(4*xi_2-2)/3,
+                                                    8*(-xi_2*(4*xi_0-1)*(4*xi_0-2)-4*xi_0*xi_2*(4*xi_0-2)-4*xi_0*xi_2*(4*xi_0-1))/3,
+                                                    32*(-xi_1*xi_2*(4*xi_0-1)+xi_0*xi_2*(4*xi_0-1)-4*xi_0*xi_1*xi_2),
+                                                    32*(-xi_1*xi_2*(4*xi_1-1)+xi_0*xi_2*(4*xi_1-1)+4*xi_0*xi_1*xi_2),
+                                                    32*(-xi_1*xi_2*(4*xi_2-1)+xi_0*xi_2*(4*xi_2-1))]),
+                                          np.array([-((4*xi_0-1)*(4*xi_0-2)*(4*xi_0-3)+4*xi_0*(4*xi_0-2)*(4*xi_0-3)+4*xi_0*(4*xi_0-1)*(4*xi_0-3)+4*xi_0*(4*xi_0-1)*(4*xi_0-2))/6, 
+                                                    np.zeros(n_q),
+                                                    ((4*xi_2-1)*(4*xi_2-2)*(4*xi_2-3)+4*xi_2*(4*xi_2-2)*(4*xi_2-3)+4*xi_2*(4*xi_2-1)*(4*xi_2-3)+4*xi_2*(4*xi_2-1)*(4*xi_2-2))/6,
+                                                    4*(-xi_1*(4*xi_0-1)*(4*xi_1-1)-4*xi_0*xi_1*(4*xi_1-1)),
+                                                    4*(xi_1*(4*xi_1-1)*(4*xi_2-1)+4*xi_1*xi_2*(4*xi_1-1)),
+                                                    4*(-xi_2*(4*xi_0-1)*(4*xi_2-1)+xi_0*(4*xi_0-1)*(4*xi_2-1)-4*xi_0*xi_2*(4*xi_2-1)+4*xi_0*xi_2*(4*xi_0-1)),
+                                                    8*(-xi_1*(4*xi_0-1)*(4*xi_0-2)-4*xi_0*xi_1*(4*xi_0-2)-4*xi_0*xi_1*(4*xi_0-1))/3,
+                                                   -8*xi_1*(4*xi_1-1)*(4*xi_1-2)/3,
+                                                    8*xi_1*(4*xi_1-1)*(4*xi_1-2)/3,
+                                                    8*(xi_1*(4*xi_2-1)*(4*xi_2-2)+4*xi_1*xi_2*(4*xi_2-2)+4*xi_1*xi_2*(4*xi_2-1))/3,
+                                                    8*(-xi_2*(4*xi_2-1)*(4*xi_2-2)+xi_0*(4*xi_2-1)*(4*xi_2-2)+4*xi_0*xi_2*(4*xi_2-2)+4*xi_0*xi_2*(4*xi_2-1))/3,
+                                                    8*(-xi_2*(4*xi_0-1)*(4*xi_0-2)+xi_0*(4*xi_0-1)*(4*xi_0-2)-4*xi_0*xi_2*(4*xi_0-2)-4*xi_0*xi_2*(4*xi_0-1))/3,
+                                                    32*(-xi_1*xi_2*(4*xi_0-1)+xi_0*xi_1*(4*xi_0-1)-4*xi_0*xi_1*xi_2),
+                                                    32*(-xi_1*xi_2*(4*xi_1-1)+xi_0*xi_1*(4*xi_1-1)),
+                                                    32*(-xi_1*xi_2*(4*xi_2-1)+xi_0*xi_1*(4*xi_2-1)+4*xi_0*xi_1*xi_2)]))
+                 }
 
     return init_dict[el_type]
 
@@ -1194,7 +1253,7 @@ def draw_mesh(coordinates: np.array, elements: np.array, elem_type: LagrangeElem
 
     # Draw polygons
     polygons = None
-    if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2):
+    if elem_type in (LagrangeElementType.P1, LagrangeElementType.P2, LagrangeElementType.P4):
         polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:3, ].transpose()]
     elif elem_type in (LagrangeElementType.Q1, LagrangeElementType.Q2):
         polygons = [[coord_aux[idx] for idx in idx_list] for idx_list in elements[0:4, ].transpose()]
@@ -1292,7 +1351,161 @@ def draw_quantity(coordinates, elements, u, q_node):
     plt.show()
 
 
-def create_midpoints(elem_type: LagrangeElementType, coord, elem):
+def create_midpoints_P4(coord, elem):
+    # numbers of elements and vertices
+    n_e = elem.shape[1]
+    n_n = coord.shape[1]
+
+    # predefinition of unknown arrays
+    coord_mid = np.zeros((2, 10*n_e))
+    elem_mid = np.zeros((12, n_e))
+    surf = np.zeros((5, n_e))
+
+    # for cyclus over elements
+    ind = -1
+    ind_s = -1
+    for i in range(n_e):
+        # vertices defining the i-th element
+        V1 = elem[0, i]
+        V2 = elem[1, i]
+        V3 = elem[2, i]
+
+        # creation of the midpoints which do not belong on edges
+        coord_mid[:, ind+1] = coord[:, V1]/2 + coord[:, V2]/4 + coord[:, V3]/4
+        elem_mid[9, i] = n_n + ind + 1
+
+        coord_mid[:, ind+2] = coord[:, V1]/4 + coord[:, V2]/2 + coord[:, V3]/4
+        elem_mid[10, i] = n_n + ind + 2
+
+        coord_mid[:, ind+3] = coord[:, V1]/4 + coord[:, V2]/4 + coord[:, V3]/2
+        elem_mid[11, i] = n_n + ind + 3
+
+        ind = ind + 3
+
+        # analysis of the edge V1-V2
+        if elem_mid[0, i] == 0:
+            # creation of new midpoints lying on the edge V1-V2
+            coord_mid[:, ind+1] = (coord[:, V1] + coord[:, V2])/2
+            elem_mid[0, i] = n_n+ind+1
+
+            coord_mid[:, ind+2] = 3*coord[:,V1]/4+coord[:, V2]/4
+            elem_mid[3, i] = n_n+ind+2
+
+            coord_mid[:, ind+3] = coord[:, V1]/4+3*coord[:, V2]/4
+            elem_mid[4, i] = n_n+ind+3
+
+            # finding the adjacent element j to i which contains the edge V1-V2
+            row1, col1 = np.where(elem==V1)
+            row2, col2 = np.where(elem==V2)
+            j = np.setdiff1d(np.intersect1d(col1,col2), i)
+            if len(j):
+                # This case means that the edge V1-V2 is the intersection of the
+                # elements i and j.
+                v = elem[:, j]
+                if V2 == v[0]:
+                    elem_mid[0, j] = n_n+ind+1
+                    elem_mid[3, j] = n_n+ind+3
+                    elem_mid[4, j] = n_n+ind+2
+                elif V2 == v[1]:
+                    elem_mid[1, j] = n_n+ind+1
+                    elem_mid[5, j] = n_n+ind+3
+                    elem_mid[6, j] = n_n+ind+2
+                else:
+                    elem_mid[2, j] = n_n+ind+1
+                    elem_mid[7, j] = n_n+ind+3
+                    elem_mid[8, j] = n_n+ind+2
+            else:
+                ind_s += 1
+                surf[:, ind_s] = np.array([[V2], [V1], [n_n+ind+1], [n_n+ind+2], [n_n+ind+3]])
+
+            ind += 3
+
+        # analysis of the edge V2-V3
+        if elem_mid[1, i] == 0:
+            # creation of new midpoints lying on the edge V2-V3
+            coord_mid[:, ind+1] = (coord[:, V2] + coord[:, V3])/2
+            elem_mid[1, i] = n_n+ind+1
+
+            coord_mid[:, ind+2] = 3*coord[:, V2]/4 + coord[:, V3]/4
+            elem_mid[5, i] = n_n+ind+2
+
+            coord_mid[:, ind+3] = coord[:, V2]/4 + 3*coord[:, V3]/4
+            elem_mid[6, i] = n_n+ind+3
+
+            # finding the adjacent element j to i which contains the edge V2-V3
+            row1, col1 = np.where(elem == V2)
+            row2, col2 = np.where(elem == V3)
+            j = np.setdiff1d(np.intersect1d(col1, col2), i)
+
+            if len(j):
+                # This case means that the edge V2-V3 is the intersection of the
+                # elements i and j.
+                v = elem[:, j]
+                if V3 == v[0]:
+                    elem_mid[0, j] = n_n+ind+1
+                    elem_mid[3, j] = n_n+ind+3
+                    elem_mid[4, j] = n_n+ind+2
+                elif V3 == v[1]:
+                    elem_mid[1, j] = n_n+ind+1
+                    elem_mid[5, j] = n_n+ind+3
+                    elem_mid[6, j] = n_n+ind+2
+                else:
+                    elem_mid[2, j] = n_n+ind+1
+                    elem_mid[7, j] = n_n+ind+3
+                    elem_mid[8, j] = n_n+ind+2
+            else:
+                ind_s += 1
+                surf[:, ind_s] = np.array([[V3], [V2], [n_n+ind+1], [n_n+ind+2], [n_n+ind+3]])
+
+            ind += 3
+
+        # analysis of the edge V3-V1
+        if elem_mid[2, i] == 0:
+            # creation of new midpoints lying on the edge V3-V1
+            coord_mid[:, ind+1] = (coord[:, V3] + coord[:, V1])/2
+            elem_mid[2, i] = n_n+ind+1
+
+            coord_mid[:, ind+2] = 3*coord[:, V3]/4+coord[:, V1]/4
+            elem_mid[7, i] = n_n+ind+2
+
+            coord_mid[:, ind+3] = coord[:, V3]/4+3*coord[:, V1]/4
+            elem_mid[8, i] = n_n+ind+3
+
+            # finding the adjacent element j to i which contains the edge V3-V1
+            row1, col1 = np.where(elem == V3)
+            row2, col2 = np.where(elem == V1)
+            j = np.setdiff1d(np.intersect1d(col1, col2), i)
+            if len(j):
+                # This case means that the edge V3-V1 is the intersection of the
+                # elements i and j.
+                v = elem[:, j]
+                if V1 == v[0]:
+                    elem_mid[0, j] = n_n+ind+1
+                    elem_mid[3, j] = n_n+ind+3
+                    elem_mid[4, j] = n_n+ind+2
+                elif V1 == v[1]:
+                    elem_mid[1, j] = n_n+ind+1
+                    elem_mid[5, j] = n_n+ind+3
+                    elem_mid[6, j] = n_n+ind+2
+                else:
+                    elem_mid[2, j] = n_n+ind+1
+                    elem_mid[7, j] = n_n+ind+3
+                    elem_mid[8, j] = n_n+ind+2
+            else:
+                ind_s += 1
+                surf[:, ind_s] = np.array([[V1], [V3], [n_n+ind+1], [n_n+ind+2], [n_n+ind+3]]).flatten()
+
+            ind += 3
+
+    coord_mid = coord_mid[:, 0:ind+1]
+    surf = surf[:, 0:ind_s+1]
+    coord_ext = np.concatenate([coord, coord_mid], axis=1)
+    elem_ext = np.array(np.concatenate([elem, elem_mid], axis=0), dtype=int)
+
+    return {'coord_mid': coord_mid, 'surf': surf, 'coord_ext': coord_ext, 'elem_ext': elem_ext}
+
+
+def create_midpoints_P2(coord, elem):
     # numbers of elements and vertices
     n_e = elem.shape[1]
     n_n = coord.shape[1]
@@ -1413,6 +1626,13 @@ def create_midpoints(elem_type: LagrangeElementType, coord, elem):
             'elem_ed': elem_ed, 'edge_el': edge_el}
 
 
+def create_midpoints(elem_type, coord, elem):
+    if elem_type == LagrangeElementType.P2:
+        return create_midpoints_P2(coord, elem)
+    elif elem_type == LagrangeElementType.P4:
+        return create_midpoints_P4(coord, elem)
+
+
 # @njit
 def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
                    level: int = 1,
@@ -1467,13 +1687,9 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
     coords = np.genfromtxt('coord.csv', delimiter=',')
     elem = np.genfromtxt('elem.csv', delimiter=',', dtype=int) - 1
 
-    # TODO implement
-    if element_type == LagrangeElementType.P2:
-        midp_dict = create_midpoints(element_type, coords, elem)
-        coords = midp_dict['coord_ext']
-        elem = midp_dict['elem_ext']
-    elif element_type == LagrangeElementType.P4:
-        pass
+    midp_dict = create_midpoints(element_type, coords, elem)
+    coords = midp_dict['coord_ext']
+    elem = midp_dict['elem_ext']
 
     # Nodes with Dirichlet boundary condition
     Q = np.ones(np.shape(coords), dtype=bool)
@@ -1555,7 +1771,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
             E = (B @ U_it.reshape((-1, 1), order='F')).reshape((3, -1), order='F')
             const_problem = construct_constitutive_problem(E, E0_zeta, Ep_old, shear_mod, bulk_mod, eta, c)
             vD = np.tile(weight, (9, 1)) * const_problem['ds']
-            print(f'vD: {vD[:10]}')
+            # print(f'vD: {vD[:10]}')
             D_p = ssp.csr_matrix((flatten_row(vD)[0], (flatten_row(iD)[0] - 1, flatten_row(jD)[0] - 1)),
                                  shape=(3 * n_int, 3 * n_int))
             K_tangent = K + B.T * (D_p-D_elast) * B
@@ -1564,7 +1780,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
 
             dU.T[Q.T] = np.linalg.solve(K_tangent_masked, -F.T[Q.T])
             dU_flat = dU.flatten(order='F')
-            print(f'inner iter: {it}')
+            # print(f'inner iter: {it}')
             U_new = U_it + dU_flat.reshape((2, -1), order='F')
             U_it_flat = U_it.flatten(order='F')
             U_new_flat = U_new.flatten(order='F')
@@ -1613,7 +1829,7 @@ def elasticity_fem(element_type: LagrangeElementType = LagrangeElementType.P1,
             print('Too small load increments.')
             break
 
-        print(f'step = {step}')
+        # print(f'step = {step}')
 
     # TODO move drawing outside of the function
     # TODO return variables important for subsequent plotting
